@@ -26,7 +26,7 @@ try:
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant client: {str(e)}")
     client = None
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "etc/secrets/sahayakai-462506-9ab8250eff98.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/etc/secrets/sahayakai-462506-9ab8250eff98.json"
 # Initialize embeddings model
 try:
     embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
