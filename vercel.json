@@ -4,7 +4,6 @@
       "src": "ShayakAI.wsgi.py",
       "use": "@vercel/python",
       "config": {
-        "distDir": "build",
         "maxLambdaSize": "50mb",
         "runtime": "python3.13"
       }
