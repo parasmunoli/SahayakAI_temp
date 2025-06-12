@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-qt-*p(-w-bc$qxn^x2*we*km87c76@!e9bus3!*=)7a4^c2n=*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['.vercel.app']
+ALLOWED_HOSTS = ['.onrender.com']
 
 AUTH_USER_MODEL = 'user.User'
 # Application definition
