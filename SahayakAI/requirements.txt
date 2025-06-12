@@ -1,0 +1,9 @@
+beautifulsoup4==4.13.4
+langchain-community==0.3.24
+langchain-text-splitters==0.3.8
+langchain-google-genai==2.1.5
+django==5.2.2
+djangorestframework-simplejwt==5.5.0
+djangorestframework==3.16.0
+qdrant-client==1.14.2
+langchain==0.3.25
