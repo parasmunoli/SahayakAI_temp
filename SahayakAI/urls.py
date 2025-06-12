@@ -14,10 +14,16 @@ Including another URLconf
     1. Import the include() function: from django.urls import include, path
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
-from django.urls import include
-from django.urls import path
+from django.urls import include, path
+from django.http import HttpResponse
+
+
+def home_view(request):
+    return HttpResponse("Welcome to SahayakAI")
+
 
 urlpatterns = [
+    path('', home_view),
     path('api/user/', include('user.urls')),
     path('api/rag-app/', include('rag_app.urls')),
 ]
