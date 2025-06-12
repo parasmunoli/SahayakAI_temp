@@ -1,18 +1,28 @@
 {
+  "version": 2,
   "builds": [
     {
-      "src": "ShayakAI.wsgi.py",
+      "src": "SahayakAI/wsgi.py",
       "use": "@vercel/python",
+      "config": { "maxLambdaSize": "15mb", "runtime": "python3.9" }
+    },
+    {
+      "src": "build_files.sh",
+      "use": "@vercel/static-build",
       "config": {
-        "maxLambdaSize": "50mb",
-        "runtime": "python3.13"
+        "distDir": "staticfiles_build"
       }
     }
   ],
-    "routes": [
-        {
-        "src": "/(.*)",
-        "dest": "ShayakAI.wsgi.py"
-        }
-    ]
+  "routes": [
+    {
+      "src": "/static/(.*)",
+      "dest": "/static/$1"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "SahayakAI/wsgi.py"
+    }
+  ]
 }
+
