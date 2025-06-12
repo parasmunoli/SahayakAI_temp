@@ -80,14 +80,8 @@ WSGI_APPLICATION = 'SahayakAI.wsgi.application'
 
 DATABASES = {
     'default': {
-        'ENGINE': 'djongo',
-        'NAME': 'SahayakAI',
-        'CLIENT': {
-            'host': 'mongodb://localhost:27017/',
-            'username': 'ShayakAI',
-            'password': 'root@1234',
-            'authSource': 'admin',
-        }
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': BASE_DIR / 'database.sqlite3',
     }
 }
 
