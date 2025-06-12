@@ -32,6 +32,7 @@ AUTH_USER_MODEL = 'user.User'
 # Application definition
 
 INSTALLED_APPS = [
+    'corsheaders',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -75,19 +76,23 @@ TEMPLATES = [
 WSGI_APPLICATION = 'SahayakAI.wsgi.application'
 
 
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'ENGINE': 'djongo',
+        'NAME': 'SahayakAI',
+        'CLIENT': {
+            'host': 'mongodb://localhost:27017/',
+            'username': 'ShayakAI',
+            'password': 'root@1234',
+            'authSource': 'admin',
+        }
     }
 }
 
 
-# Password validation
-# https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
+
+
 
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -183,7 +188,7 @@ SIMPLE_JWT = {
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
-    "http://127.0.0.1:3000",
+    ".render.com",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
