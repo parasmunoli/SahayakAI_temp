@@ -152,7 +152,7 @@ def chat(request):
 
         if not user_message:
             return JsonResponse(
-                {"error": "Message is required"},
+                {'success': False, 'code': 400 , 'error': "Message is required"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
@@ -161,7 +161,8 @@ def chat(request):
 
         if not contexts:
             return JsonResponse({
-                "success": True,
+                'success': True,
+                'code': 404,
                 "response": "I don't have any relevant documentation to answer your question. Please upload some documentation first using the /create_embedding endpoint.",
                 "user_message": user_message,
                 "sources": [],
@@ -206,7 +207,8 @@ def chat(request):
         logger.info(f"RAG chat request from user {request.user.id}: {user_message[:100]}...")
 
         return JsonResponse({
-            "success": True,
+            'success': True,
+            'code': 200,
             "response": ai_response,
             "user_message": user_message,
             "sources": sources,
@@ -216,13 +218,19 @@ def chat(request):
         }, status=status.HTTP_200_OK)
 
     except json.JSONDecodeError:
-        return JsonResponse(
-            {"error": "Invalid JSON format"},
+        return JsonResponse({
+            'success': False,
+            'code': 400,
+            'error': "Invalid JSON format"
+        },
             status=status.HTTP_400_BAD_REQUEST
         )
     except Exception as e:
         logger.error(f"Chat API error: {str(e)}")
-        return JsonResponse(
-            {"error": "An error occurred while processing your request"},
+        return JsonResponse({
+            'success': False,
+            'code': 500,
+            'error': "An error occurred while processing your request"
+                             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

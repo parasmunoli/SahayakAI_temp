@@ -42,6 +42,8 @@ def get_tokens_for_user(user):
     # Keep user_id for JWT functionality - don't delete it
 
     return {
+        'success': True,
+        'code': 200,
         'refresh': str(refresh),
         'access': str(refresh.access_token),
     }
@@ -75,6 +77,8 @@ def signup(request):
         # Enhanced validation
         if not email or not password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Email and password are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -83,16 +87,22 @@ def signup(request):
             validate_email(email)
         except ValidationError:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Invalid email format.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if User.objects.filter(email=email).exists():
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Email already exists.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if password != confirm_password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Passwords do not match.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -101,6 +111,8 @@ def signup(request):
             validate_password(password)
         except ValidationError as e:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Password validation failed.',
                 'details': list(e.messages)
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -116,6 +128,8 @@ def signup(request):
         logger.info(f"New user registered: {user.email}")
 
         return Response({
+            'success': True,
+            'code': 201,
             'message': 'User created successfully.',
             'user': {
                 'id': user.id,
@@ -128,6 +142,8 @@ def signup(request):
     except Exception as e:
         logger.error(f"Signup error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to create user.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -142,6 +158,8 @@ def login(request):
 
         if not email or not password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Email and password are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -151,6 +169,8 @@ def login(request):
         if user is not None:
             if not user.is_active:
                 return Response({
+                    'success': False,
+                    'code': 401,
                     'error': 'Account is deactivated.'
                 }, status=status.HTTP_401_UNAUTHORIZED)
 
@@ -164,6 +184,8 @@ def login(request):
             tokens = get_tokens_for_user(user)
 
             return Response({
+                'success': True,
+                'code': 200,
                 'message': 'Login successful.',
                 'user': {
                     'id': user.id,
@@ -184,12 +206,16 @@ def login(request):
                 pass
 
             return Response({
+                'success': False,
+                'code': 401,
                 'error': 'Invalid email or password.'
             }, status=status.HTTP_401_UNAUTHORIZED)
 
     except Exception as e:
         logger.error(f"Login error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Login failed.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -203,6 +229,8 @@ def logout(request):
 
         if not refresh_token:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Refresh token is required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -212,16 +240,22 @@ def logout(request):
         logger.info(f"User {request.user.email} logged out successfully")
 
         return Response({
+            'success': True,
+            'code': 200,
             'message': 'Logged out successfully.'
         }, status=status.HTTP_200_OK)
 
     except TokenError as e:
         return Response({
+            'success': False,
+            'code': 400,
             'error': 'Invalid or expired token.'
         }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Logout error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Logout failed.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -235,6 +269,8 @@ def refresh_token(request):
 
         if not refresh_token:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Refresh token is required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -242,16 +278,22 @@ def refresh_token(request):
         access_token = refresh.access_token
 
         return Response({
+            'success': True,
+            'code': 200,
             'access': str(access_token)
         }, status=status.HTTP_200_OK)
 
     except TokenError:
         return Response({
+            'success': False,
+            'code': 401,
             'error': 'Invalid or expired refresh token.'
         }, status=status.HTTP_401_UNAUTHORIZED)
     except Exception as e:
         logger.error(f"Token refresh error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Token refresh failed.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -263,7 +305,8 @@ def profile(request):
     user = request.user
 
     return Response({
-        'id': user.id,
+        'success': True,
+        'code': 200,
         'username': user.username,
         'email': user.email,
         'first_name': user.first_name,
@@ -294,12 +337,16 @@ def update_profile(request):
                 validate_email(email)
             except ValidationError:
                 return Response({
+                    'success': False,
+                    'code': 400,
                     'error': 'Invalid email format.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             # Check if email is already taken
             if User.objects.filter(email=email).exists():
                 return Response({
+                    'success': False,
+                    'code': 400,
                     'error': 'Email already exists.'
                 }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -310,6 +357,8 @@ def update_profile(request):
         user.save()
 
         return Response({
+            'success': True,
+            'code': 200,
             'message': 'Profile updated successfully.',
             'user': {
                 'id': user.id,
@@ -324,6 +373,8 @@ def update_profile(request):
     except Exception as e:
         logger.error(f"Profile update error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to update profile.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -340,16 +391,22 @@ def change_password(request):
 
         if not old_password or not new_password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Both old and new passwords are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if confirm_password and new_password != confirm_password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'New passwords do not match.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if not user.check_password(old_password):
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Old password is incorrect.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -361,17 +418,23 @@ def change_password(request):
         logger.info(f"Password changed for user: {user.email}")
 
         return Response({
+            'success': True,
+            'code': 200,
             'message': 'Password changed successfully.'
         }, status=status.HTTP_200_OK)
 
     except ValidationError as e:
         return Response({
+            'success': False,
+            'code': 400,
             'error': 'Password validation failed.',
             'details': list(e.messages)
         }, status=status.HTTP_400_BAD_REQUEST)
     except Exception as e:
         logger.error(f"Password change error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to change password.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -403,6 +466,8 @@ def login_history(request):
         total_count = UserLoginHistory.objects.filter(user=user).count()
 
         return Response({
+            'success': True,
+            'code': 200,
             'login_history': history_data,
             'total_count': total_count,
             'limit': limit,
@@ -412,6 +477,8 @@ def login_history(request):
     except Exception as e:
         logger.error(f"Login history error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to retrieve login history.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -426,11 +493,15 @@ def delete_account(request):
 
         if not password:
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Password is required to delete account.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
         if not user.check_password(password):
             return Response({
+                'success': False,
+                'code': 400,
                 'error': 'Incorrect password.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
@@ -441,12 +512,16 @@ def delete_account(request):
         logger.info(f"Account deactivated: {user.email}")
 
         return Response({
+            'success': True,
+            'code': 200,
             'message': 'Account deactivated successfully.'
         }, status=status.HTTP_200_OK)
 
     except Exception as e:
         logger.error(f"Account deletion error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to delete account.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -465,7 +540,8 @@ def user_stats(request):
         ).order_by('-login_time').first()
 
         stats = {
-            'user_id': user.id,
+            'success': True,
+            'code': 200,
             'username': user.username,
             'email': user.email,
             'account_created': user.created_at,
@@ -482,6 +558,8 @@ def user_stats(request):
     except Exception as e:
         logger.error(f"User stats error: {str(e)}")
         return Response({
+            'success': False,
+            'code': 500,
             'error': 'Failed to retrieve user statistics.'
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -492,6 +570,8 @@ def get_user_id(request):
     """Get the user ID of the authenticated user"""
     user = request.user
     return Response({
+        'success': True,
+        'code': 200,
         'user_id': user.id,
         'username': user.username,
         'email': user.email
