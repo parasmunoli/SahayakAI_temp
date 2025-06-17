@@ -26,7 +26,7 @@ SECRET_KEY = 'django-insecure-qt-*p(-w-bc$qxn^x2*we*km87c76@!e9bus3!*=)7a4^c2n=*
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['.onrender.com']
+ALLOWED_HOSTS = []
 
 AUTH_USER_MODEL = 'user.User'
 # Application definition
@@ -81,7 +81,7 @@ WSGI_APPLICATION = 'SahayakAI.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'database.sqlite3',
+        'NAME': BASE_DIR / 'db.sqlite3',
     }
 }
 

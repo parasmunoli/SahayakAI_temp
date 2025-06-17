@@ -1,13 +1,12 @@
 from django.http import JsonResponse
 import logging
 from typing import List, Dict, Any
-import tempfile
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.decorators import api_view, permission_classes
 from qdrant_client import QdrantClient
 from langchain.chat_models import init_chat_model
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
-from qdrant_client.models import Distance, VectorParams
+from qdrant_client.models import PointStruct, VectorParams, Distance
 import os
 from rest_framework import status
 import json
@@ -15,19 +14,24 @@ from urllib.parse import urlparse
 import requests
 from dotenv import load_dotenv
 from django.utils import timezone
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain.document_loaders import RecursiveUrlLoader
+from bs4 import BeautifulSoup
+import uuid
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 load_dotenv()
 
-# Initialize Qdrant client
 try:
-    client = QdrantClient(url=os.getenv("QDRANT_URL"), api_key=os.getenv("QDRANT_API_KEY"))
+    client = QdrantClient(url='localhost', port=6333)
     logger.info("Qdrant client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant client: {str(e)}")
     client = None
+# "/etc/secrets/sahayakai-462506-9ab8250eff98.json" for production
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/etc/secrets/sahayakai-462506-9ab8250eff98.json"
-# Initialize embeddings model
+
 try:
     embeddings_model = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     logger.info("Embeddings model initialized successfully")
@@ -44,7 +48,7 @@ def validate_url(url: str) -> bool:
             return False
 
         # Basic security check - avoid local/private IPs
-        if parsed.hostname in ['localhost', '127.0.0.1'] or parsed.hostname.startswith('192.168.'):
+        if parsed.hostname in ['localhost', '127.0.0.1'] or (parsed.hostname and parsed.hostname.startswith('192.168.')):
             return False
 
         # Test if URL is accessible
@@ -53,10 +57,6 @@ def validate_url(url: str) -> bool:
     except Exception:
         return False
 
-
-def get_user_collection_name(user_id: int) -> str:
-    """Generate collection name for user"""
-    return f"user_{user_id}_docs"
 
 
 def ensure_collection_exists(collection_name: str) -> bool:
@@ -87,15 +87,16 @@ def generate_system_prompt(context) -> str:
     return f"""You are a technical documentation assistant. You help developers understand codebases and documentation by analyzing provided {context} chunks.
 
 Your responsibilities:
-- Analyze the provided {context} to understand relevant code/documentation
-- Provide clear, accurate explanations based ONLY on the provided {context}
+- Analyze the provided {context} to understand relevant information or code
+- Provide clear explanations based ONLY on the provided {context}
 - Include code examples when available in the {context}
-- Reference the source URL for each piece of information you use
+- Reference the non clickable source URL for each piece of information you use, give the full url only once.
+- while referencing the source URL, include the #title of the document in the url, e.g. https://example.com/document/#<topic_title>
 - If multiple chunks are relevant, integrate them coherently
 - If the {context} doesn't contain enough information, say so honestly
 - For navigation questions, provide specific URLs or section references when available
 
-Format your responses using Markdown for clarity. Always cite your sources.
+Format your responses using simple text for clarity. Always cite your sources.
 
 Important: Only use information from the provided {context}. Do not make assumptions or add information not present in the {context}."""
 
@@ -103,8 +104,15 @@ Important: Only use information from the provided {context}. Do not make assumpt
 def retrieve_relevant_context(query: str, limit: int = 5) -> List[Dict[str, Any]]:
     """Retrieve relevant context from user's vector database"""
     try:
+        if not client:
+            logger.error("Client model not initialized")
+            return []
+        elif not embeddings_model:
+            logger.error("Embeddings model not initialized")
+            return []
+            
         print(f"Retrieving context for query: {query}")
-        collection_name = 'ChaiDocs'  # Default collection name for documentation
+        collection_name = 'ChaiDocs'
 
         # Generate query embedding
         query_embedding = embeddings_model.embed_query(query)
@@ -122,12 +130,13 @@ def retrieve_relevant_context(query: str, limit: int = 5) -> List[Dict[str, Any]
         contexts = []
         for point in search_results.points:  # Access the points attribute
             try:
-                contexts.append({
-                    "content": point.payload.get('page_content'),
-                    "source_url": point.payload.get('metadata', {}).get('source_url'),
-                    "title": point.payload.get('metadata', {}).get('title'),
-                    "score": point.score if hasattr(point, 'score') else None
-                })
+                if point.payload:
+                    contexts.append({
+                        "content": point.payload.get('page_content'),
+                        "source_url": point.payload.get('metadata', {}).get('source_url'),
+                        "title": point.payload.get('metadata', {}).get('title'),
+                        "score": point.score if hasattr(point, 'score') else None
+                    })
             except Exception as e:
                 logger.error(f"Error processing search result: {str(e)}")
                 continue
@@ -165,7 +174,7 @@ def chat(request):
                 'code': 404,
                 "response": "I don't have any relevant documentation to answer your question. Please upload some documentation first using the /create_embedding endpoint.",
                 "user_message": user_message,
-                "sources": [],
+                "sources": [0],
                 "user_id": request.user.id
             })
 
@@ -234,3 +243,139 @@ def chat(request):
                              },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def create_embedding(request):
+    """
+    Create embeddings for user documents and store in Qdrant
+    """
+    try:
+        if not client or not embeddings_model:
+            return JsonResponse({
+                'success': False,
+                'code': 500,
+                'error': "Vector database or embeddings model not initialized"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        data = json.loads(request.body) if request.body else {}
+        document_url = data.get('link')
+
+        if not document_url or not validate_url(document_url):
+            return JsonResponse({
+                'success': False,
+                'code': 400,
+                'error': "Invalid or inaccessible document URL"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        collection_name = request.collection_name
+        
+        client.create_collection(
+            collection_name=collection_name,
+            vectors_config=VectorParams(size=768, distance=Distance.COSINE)
+        )
+        print(f"Created collection: {collection_name}")
+
+        loader = RecursiveUrlLoader(
+            url=document_url,
+            max_depth=1000,
+            extractor=lambda html: BeautifulSoup(html, "html.parser").get_text()
+        )
+
+        docs = loader.load()
+        
+        if not docs:
+            return JsonResponse({
+                'success': False,
+                'code': 400,
+                'error': "No content could be extracted from the provided URL"
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=400)
+        
+        # Process documents and create points
+        points = []
+        total_docs = len(docs)
+        
+        for doc_index, doc in enumerate(docs, 1):
+            logger.info(f"Processing document {doc_index}/{total_docs}")
+            
+            # Split text into chunks
+            chunks = text_splitter.create_documents(
+                texts=[doc.page_content],
+                metadatas=[{
+                    "source_url": doc.metadata.get('source', document_url),
+                    "title": doc.metadata.get('title', f"Document {doc_index}"),
+                    "timestamp": datetime.now().isoformat(),
+                    "chunk_size": 1000,
+                    "chunk_overlap": 400,
+                    "content_type": "documentation",
+                    "original_url": document_url
+                }]
+            )
+            
+            chunk_embeddings = embeddings_model.embed_documents([chunk.page_content for chunk in chunks])
+            
+            for chunk_index, (chunk, embedding) in enumerate(zip(chunks, chunk_embeddings)):
+                point = PointStruct(
+                    id=str(uuid.uuid4()),
+                    vector=embedding,
+                    payload={
+                        "page_content": chunk.page_content,
+                        "metadata": chunk.metadata,
+                        "doc_index": doc_index,
+                        "chunk_index": chunk_index,
+                        "total_chunks": len(chunks),
+                        "processing_timestamp": datetime.now().isoformat()
+                    }
+                )
+                points.append(point)
+
+        batch_size = 100
+        total_batches = (len(points) + batch_size - 1) // batch_size
+        
+        logger.info(f"Inserting {len(points)} vectors in {total_batches} batches...")
+        
+        for i in range(0, len(points), batch_size):
+            batch = points[i:i + batch_size]
+            current_batch = i // batch_size + 1
+            try:
+                client.upsert(
+                    collection_name=collection_name,
+                    points=batch
+                )
+                logger.info(f"Inserted batch {current_batch}/{total_batches}")
+            except Exception as e:
+                logger.error(f"Error inserting batch {current_batch}: {str(e)}")
+                return JsonResponse({
+                    'success': False,
+                    'code': 500,
+                    'error': f"Failed to insert batch {current_batch}: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        logger.info(f"Successfully created and stored {len(points)} vectors in collection: {collection_name}")
+
+        return JsonResponse({
+            'success': True,
+            'code': 201,
+            "message": f"Documents embedded and stored successfully ({len(points)} chunks processed from {total_docs} documents)",
+            "collection_name": collection_name,
+            "documents_processed": total_docs,
+            "chunks_created": len(points),
+            "user_id": request.user.id
+        }, status=status.HTTP_201_CREATED)
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            'success': False,
+            'code': 400,
+            'error': "Invalid JSON format"
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        logger.error(f"Embedding API error: {str(e)}")
+        return JsonResponse({
+            'success': False,
+            'code': 500,
+            'error': "An error occurred while processing your request"
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
