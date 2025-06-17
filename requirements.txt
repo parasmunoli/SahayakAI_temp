@@ -8,3 +8,4 @@ djangorestframework==3.16.0
 qdrant-client==1.14.2
 langchain==0.3.25
 django-cors-headers==4.7.0
+apscheduler==3.11.0

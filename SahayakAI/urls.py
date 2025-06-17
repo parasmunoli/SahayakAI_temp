@@ -15,15 +15,24 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.urls import include, path
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 
 
 def home_view(request):
     return HttpResponse("Welcome to SahayakAI")
 
+def status_view(request):
+    return JsonResponse({
+        "success": True,
+        "code": 200,
+        "status": "ok",
+        "message": "SahayakAI is running."
+    })
+
 
 urlpatterns = [
     path('', home_view),
+    path('status', status_view),
     path('api/user/', include('user.urls')),
     path('api/rag-app/', include('rag_app.urls')),
 ]
