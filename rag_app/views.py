@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 try:
-    client = QdrantClient(url='localhost', port=6333)
+    client = QdrantClient(url=os.getenv("QDRANT_URL"), port=6333, api_key=os.getenv("QDRANT_API_KEY"))
     logger.info("Qdrant client initialized successfully")
 except Exception as e:
     logger.error(f"Failed to initialize Qdrant client: {str(e)}")
